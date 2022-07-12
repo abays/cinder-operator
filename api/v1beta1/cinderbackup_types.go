@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Red Hat
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,37 +17,68 @@ limitations under the License.
 package v1beta1
 
 import (
+	condition "github.com/openstack-k8s-operators/lib-common/pkg/condition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CinderBackupSpec defines the desired state of CinderBackup
 type CinderBackupSpec struct {
-	// CR name of managing controller object to identify the config maps
-	ManagingCrName string `json:"managingCrName,omitempty"`
-	// Cinder Backup node selector
-	NodeSelectorRoleName string `json:"nodeSelectorRoleName,omitempty"`
-	// Cinder Database Hostname String
-	DatabaseHostname string `json:"databaseHostname,omitempty"`
-	// Cinder Backup Container Image URL
+	// +kubebuilder:validation:Required
+	// ManagingCrName - CR name of managing controller object to identify the config maps
+	ManagingCrName string `json:"managingCrName"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=cinder
+	// ServiceUser - optional username used for this service to register in cinder
+	ServiceUser string `json:"serviceUser"`
+
+	// +kubebuilder:validation:Optional
+	// ContainerImage - Cinder API Container Image URL
 	ContainerImage string `json:"containerImage,omitempty"`
-	// Cinder Backup Replicas
+
+	// +kubebuilder:validation:Required
+	// Replicas - Cinder API Replicas
 	Replicas int32 `json:"replicas"`
-	// Secret containing: CinderPassword, TransportURL
-	CinderSecret string `json:"cinderSecret,omitempty"`
-	// Secret containing: NovaPassword
-	NovaSecret string `json:"novaSecret,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// DatabaseHostname - Cinder Database Hostname
+	DatabaseHostname string `json:"databaseHostname"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=cinder
+	// DatabaseUser - optional username used for cinder DB, defaults to cinder
+	// TODO: -> implement needs work in mariadb-operator, right now only cinder
+	DatabaseUser string `json:"databaseUser,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// Secret containing OpenStack password information for CinderDatabasePassword, AdminPassword
+	Secret string `json:"secret"`
+
+	// +kubebuilder:validation:Optional
+	// PasswordSelectors - Selectors to identify the DB and AdminUser password and TransportURL from the Secret
+	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// NodeSelector to target subset of worker nodes for running the Backup service
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
+	// actual action pod gets started with sleep infinity
+	Debug CinderDebug `json:"debug,omitempty"`
 }
 
 // CinderBackupStatus defines the observed state of CinderBackup
 type CinderBackupStatus struct {
-	// hashes of Secrets, CMs
-	Hashes []Hash `json:"hashes,omitempty"`
-	// CinderBackupHash deployment hash
-	CinderBackupHash string `json:"cinderBackupHash"`
+	// Map of hashes to track e.g. job status
+	Hash map[string]string `json:"hash,omitempty"`
+
+	// Conditions
+	Conditions condition.List `json:"conditions,omitempty" optional:"true"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
 
 // CinderBackup is the Schema for the cinderbackups API
 type CinderBackup struct {
@@ -58,7 +89,7 @@ type CinderBackup struct {
 	Status CinderBackupStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+//+kubebuilder:object:root=true
 
 // CinderBackupList contains a list of CinderBackup
 type CinderBackupList struct {

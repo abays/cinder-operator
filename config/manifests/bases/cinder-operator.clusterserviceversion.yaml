@@ -1,0 +1,66 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: cinder-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: CinderAPI is the Schema for the cinderapis API
+      displayName: Cinder API
+      kind: CinderAPI
+      name: cinderapis.cinder.openstack.org
+      version: v1beta1
+    - description: CinderBackup is the Schema for the cinderbackups API
+      displayName: Cinder Backup
+      kind: CinderBackup
+      name: cinderbackups.cinder.openstack.org
+      version: v1beta1
+    - description: Cinder is the Schema for the cinders API
+      displayName: Cinder
+      kind: Cinder
+      name: cinders.cinder.openstack.org
+      version: v1beta1
+    - description: CinderScheduler is the Schema for the cinderschedulers API
+      displayName: Cinder Scheduler
+      kind: CinderScheduler
+      name: cinderschedulers.cinder.openstack.org
+      version: v1beta1
+    - description: CinderVolume is the Schema for the cindervolumes API
+      displayName: Cinder Volume
+      kind: CinderVolume
+      name: cindervolumes.cinder.openstack.org
+      version: v1beta1
+  description: Cinder Operator
+  displayName: Cinder Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - openstack
+  - cn-openstack
+  links:
+  - name: Cinder Operator
+    url: https://github.com/openstack-k8s-operators/cinder-operator
+  maturity: alpha
+  provider:
+    name: Red Hat
+    url: https://redhat.com
+  version: 0.0.0

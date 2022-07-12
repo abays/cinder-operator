@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Red Hat
+Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,32 +17,106 @@ limitations under the License.
 package v1beta1
 
 import (
+	condition "github.com/openstack-k8s-operators/lib-common/pkg/condition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// DbSyncHash hash
+	DbSyncHash = "dbsync"
+
+	// DeploymentHash hash used to detect changes
+	DeploymentHash = "deployment"
 )
 
 // CinderSpec defines the desired state of Cinder
 type CinderSpec struct {
-	// Cinder Database Hostname String
-	DatabaseHostname string `json:"databaseHostname,omitempty"`
-	// Cinder API Container Image URL
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=cinder
+	// ServiceUser - optional username used for this service to register in cinder
+	ServiceUser string `json:"serviceUser"`
+
+	// +kubebuilder:validation:Required
+	// MariaDB instance name
+	// Right now required by the maridb-operator to get the credentials from the instance to create the DB
+	// Might not be required in future
+	DatabaseInstance string `json:"databaseInstance,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=cinder
+	// DatabaseUser - optional username used for cinder DB, defaults to cinder
+	// TODO: -> implement needs work in mariadb-operator, right now only cinder
+	DatabaseUser string `json:"databaseUser"`
+
+	// +kubebuilder:validation:Required
+	// Secret containing OpenStack password information for CinderDatabasePassword, AdminPassword
+	Secret string `json:"secret,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// PasswordSelectors - Selectors to identify the DB and AdminUser password and TransportURL from the Secret
+	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// CinderAPINodeSelector to target subset of worker nodes for running the API service
+	CinderAPINodeSelector map[string]string `json:"cinderApiNodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// CinderSchedulerNodeSelector to target subset of worker nodes for running the Scheduler service
+	CinderSchedulerNodeSelector map[string]string `json:"cinderSchedulerNodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// CinderBackupNodeSelector to target subset of worker nodes for running the Backup service
+	CinderBackupNodeSelector map[string]string `json:"cinderBackupNodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
+	// actual action pod gets started with sleep infinity
+	Debug CinderDebug `json:"debug,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	// PreserveJobs - do not delete jobs after they finished e.g. to check logs
+	PreserveJobs bool `json:"preserveJobs,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="# add your customization here"
+	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
+	// or overwrite rendered information using raw OpenStack config format. The content gets added to
+	// to /etc/<service>/<service>.conf.d directory as custom.conf file.
+	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// ConfigOverwrite - interface to overwrite default config files like e.g. logging.conf or policy.json.
+	// But can also be used to add additional files. Those get added to the service config dir in /etc/<service> .
+	// TODO: -> implement
+	DefaultConfigOverwrite map[string]string `json:"defaultConfigOverwrite,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// CinderAPIContainerImage - Cinder API Container Image URL
 	CinderAPIContainerImage string `json:"cinderAPIContainerImage,omitempty"`
-	// Cinder Backup Container Image URL
+
+	// +kubebuilder:validation:Optional
+	// CinderBackupContainerImage - Cinder Backup Container Image URL
 	CinderBackupContainerImage string `json:"cinderBackupContainerImage,omitempty"`
-	// Cinder Scheduler Container Image URL
+
+	// +kubebuilder:validation:Optional
+	// CinderSchedulerContainerImage - Cinder Scheduler Container Image URL
 	CinderSchedulerContainerImage string `json:"cinderSchedulerContainerImage,omitempty"`
-	// Cinder API Replicas
+
+	// +kubebuilder:validation:Required
+	// CinderAPIReplicas - Cinder API Replicas
 	CinderAPIReplicas int32 `json:"cinderAPIReplicas"`
-	// Cinder Backup Replicas
+
+	// +kubebuilder:validation:Required
+	// CinderBackupReplicas - Cinder Backup Replicas
 	CinderBackupReplicas int32 `json:"cinderBackupReplicas"`
-	// Cinder Backup node selector
-	CinderBackupNodeSelectorRoleName string `json:"cinderBackupNodeSelectorRoleName,omitempty"`
-	// Cinder Scheduler Replicas
+
+	// +kubebuilder:validation:Required
+	// CinderSchedulerReplicas - Cinder Scheduler Replicas
 	CinderSchedulerReplicas int32 `json:"cinderSchedulerReplicas"`
-	// Secret containing: CinderPassword, TransportURL
-	CinderSecret string `json:"cinderSecret,omitempty"`
-	// Secret containing: NovaPassword
-	NovaSecret string `json:"novaSecret,omitempty"`
-	// Cells to create
+
+	// +kubebuilder:validation:Optional
+	// CinderVolumes - cells to create
 	CinderVolumes []Volume `json:"cinderVolumes,omitempty"`
 }
 
@@ -50,24 +124,41 @@ type CinderSpec struct {
 type Volume struct {
 	// Name of cinder volume service
 	Name string `json:"name,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// Cinder Volume Container Image URL
-	CinderVolumeContainerImage string `json:"cinderVolumeContainerImage,omitempty"`
+	ContainerImage string `json:"containerImage,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=1
 	// Cinder Volume Replicas
-	CinderVolumeReplicas int32 `json:"cinderVolumeReplicas"`
+	Replicas int32 `json:"replicas"`
+
 	// Cinder Volume node selector
-	CinderVolumeNodeSelectorRoleName string `json:"cinderVolumeNodeSelectorRoleName,omitempty"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="# add your customization here"
+	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
+	// or overwrite rendered information using raw OpenStack config format. The content gets added to
+	// to /etc/<service>/<service>.conf.d directory as custom.conf file.
+	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
 }
 
 // CinderStatus defines the observed state of Cinder
 type CinderStatus struct {
-	// DbSyncHash db sync hash
-	DbSyncHash string `json:"dbSyncHash"`
-	// API endpoint
-	APIEndpoint string `json:"apiEndpoint"`
+	// Map of hashes to track e.g. job status
+	Hash map[string]string `json:"hash,omitempty"`
+
+	// Conditions
+	Conditions condition.List `json:"conditions,omitempty" optional:"true"`
+
+	// Cinder Database Hostname
+	DatabaseHostname string `json:"databaseHostname,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
 
 // Cinder is the Schema for the cinders API
 type Cinder struct {
@@ -78,7 +169,7 @@ type Cinder struct {
 	Status CinderStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+//+kubebuilder:object:root=true
 
 // CinderList contains a list of Cinder
 type CinderList struct {

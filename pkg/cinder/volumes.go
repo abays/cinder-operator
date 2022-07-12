@@ -1,4 +1,4 @@
-package common
+package cinder
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -49,16 +49,6 @@ func GetVolumes(name string) []corev1.Volume {
 			},
 		},
 		{
-			Name: "config-data-custom",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: name + "-config-data-custom",
-					},
-				},
-			},
-		},
-		{
 			Name: "config-data-merged",
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
@@ -79,11 +69,6 @@ func GetInitVolumeMounts() []corev1.VolumeMount {
 		{
 			Name:      "config-data",
 			MountPath: "/var/lib/config-data/default",
-			ReadOnly:  true,
-		},
-		{
-			Name:      "config-data-custom",
-			MountPath: "/var/lib/config-data/custom",
 			ReadOnly:  true,
 		},
 		{
